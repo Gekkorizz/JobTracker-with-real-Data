@@ -13,21 +13,22 @@ export interface Job {
   description: string;
 }
 
-const companies = [
+export const companies = [
   'Infosys', 'TCS', 'Wipro', 'Accenture', 'Capgemini', 'Cognizant', 'IBM', 'Oracle', 'SAP', 'Dell',
   'Amazon', 'Flipkart', 'Swiggy', 'Razorpay', 'PhonePe', 'Paytm', 'Zoho', 'Freshworks', 'Juspay', 'CRED',
   'Zerodha', 'Groww', 'Postman', 'BrowserStack', 'Zomato', 'Meesho', 'Urban Company', 'Dream11'
 ];
 
-const roles = [
+export const roles = [
   'SDE Intern', 'Graduate Engineer Trainee', 'Junior Backend Developer', 'Frontend Intern',
   'QA Intern', 'Data Analyst Intern', 'Java Developer', 'Python Developer', 'React Developer',
   'Full Stack Engineer', 'DevOps Engineer', 'Product Analyst'
 ];
 
-const locations = ['Bangalore', 'Hyderabad', 'Pune', 'Chennai', 'Gurgaon', 'Noida', 'Mumbai', 'Remote'];
-const modes = ['Remote', 'Hybrid', 'Onsite'] as const;
-const sources = ['LinkedIn', 'Naukri', 'Indeed', 'Wellfound', 'Company Site'] as const;
+export const locations = ['Bangalore', 'Hyderabad', 'Pune', 'Chennai', 'Gurgaon', 'Noida', 'Mumbai', 'Remote'];
+export const modes = ['Remote', 'Hybrid', 'Onsite'] as const;
+export const sources = ['LinkedIn', 'Naukri', 'Indeed', 'Wellfound', 'Company Site'] as const;
+export const experiences = ['Fresher', '0-1 Years', '1-3 Years', '3-5 Years', '5+ Years'] as const;
 
 const skillsPool = [
   'Java', 'Python', 'React', 'Node.js', 'SQL', 'AWS', 'Docker', 'Kubernetes', 'Spring Boot', 

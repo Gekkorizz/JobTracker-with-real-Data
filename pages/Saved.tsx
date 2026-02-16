@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { jobs, Job } from '../data/jobs';
 import { JobCard } from '../components/JobCard';
 import { JobDetailsModal } from '../components/JobDetailsModal';
+import { calculateMatchScore, getPreferences } from '../utils/scoring';
 
 export const Saved: React.FC = () => {
   const [savedIds, setSavedIds] = useState<string[]>([]);
@@ -15,6 +16,8 @@ export const Saved: React.FC = () => {
       setSavedIds(JSON.parse(stored));
     }
   }, []);
+
+  const preferences = getPreferences();
 
   const toggleSave = (id: string) => {
     const newIds = savedIds.filter(savedId => savedId !== id);
@@ -46,6 +49,7 @@ export const Saved: React.FC = () => {
               key={job.id} 
               job={job} 
               isSaved={true}
+              matchScore={calculateMatchScore(job, preferences)}
               onToggleSave={toggleSave}
               onView={setSelectedJob}
             />

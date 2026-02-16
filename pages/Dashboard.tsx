@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, Filter, SlidersHorizontal, ChevronDown } from 'lucide-react';
-import { jobs, Job } from '../data/jobs';
+import { Search, Filter, SlidersHorizontal, ChevronDown, Zap, AlertCircle } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { jobs, Job, locations, modes, experiences, sources } from '../data/jobs';
 import { JobCard } from '../components/JobCard';
 import { JobDetailsModal } from '../components/JobDetailsModal';
+import { calculateMatchScore, getPreferences, Preferences } from '../utils/scoring';
 
 export const Dashboard: React.FC = () => {
   // State for Filters
@@ -11,7 +13,10 @@ export const Dashboard: React.FC = () => {
   const [modeFilter, setModeFilter] = useState('');
   const [expFilter, setExpFilter] = useState('');
   const [sourceFilter, setSourceFilter] = useState('');
-  const [sortOrder, setSortOrder] = useState('latest'); // latest, salary-high, salary-low
+  const [sortOrder, setSortOrder] = useState('match-desc'); // default to match score
+
+  const [showMatchesOnly, setShowMatchesOnly] = useState(false);
+  const [preferences, setPreferences] = useState<Preferences | null>(null);
 
   // State for Saved Jobs (Local Storage)
   const [savedIds, setSavedIds] = useState<string[]>(() => {
@@ -21,6 +26,14 @@ export const Dashboard: React.FC = () => {
 
   // State for Modal
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
+
+  useEffect(() => {
+    const prefs = getPreferences();
+    setPreferences(prefs);
+    if (prefs) {
+      setShowMatchesOnly(true); // Auto-enable if prefs exist
+    }
+  }, []);
 
   // Persist Saved IDs
   useEffect(() => {
@@ -33,34 +46,38 @@ export const Dashboard: React.FC = () => {
     );
   };
 
-  // Derived Filters Lists
-  const locations = useMemo(() => Array.from(new Set(jobs.map(j => j.location))).sort(), []);
-  const modes = useMemo(() => Array.from(new Set(jobs.map(j => j.mode))).sort(), []);
-  const experiences = useMemo(() => Array.from(new Set(jobs.map(j => j.experience))).sort(), []);
-  const sources = useMemo(() => Array.from(new Set(jobs.map(j => j.source))).sort(), []);
+  // Process jobs with scores
+  const processedJobs = useMemo(() => {
+    return jobs.map(job => ({
+      ...job,
+      score: calculateMatchScore(job, preferences)
+    }));
+  }, [preferences]);
 
   // Filtering Logic
   const filteredJobs = useMemo(() => {
-    return jobs.filter(job => {
-      const matchKeyword = job.title.toLowerCase().includes(keyword.toLowerCase()) || 
+    return processedJobs.filter(job => {
+      // 1. Match Score Threshold
+      if (showMatchesOnly && preferences) {
+        if (job.score < preferences.minMatchScore) return false;
+      }
+
+      // 2. Standard Filters
+      const matchKeyword = !keyword || job.title.toLowerCase().includes(keyword.toLowerCase()) || 
                            job.company.toLowerCase().includes(keyword.toLowerCase());
-      const matchLocation = locationFilter ? job.location === locationFilter : true;
-      const matchMode = modeFilter ? job.mode === modeFilter : true;
-      const matchExp = expFilter ? job.experience === expFilter : true;
-      const matchSource = sourceFilter ? job.source === sourceFilter : true;
+      const matchLocation = !locationFilter || job.location === locationFilter;
+      const matchMode = !modeFilter || job.mode === modeFilter;
+      const matchExp = !expFilter || job.experience === expFilter;
+      const matchSource = !sourceFilter || job.source === sourceFilter;
 
       return matchKeyword && matchLocation && matchMode && matchExp && matchSource;
     }).sort((a, b) => {
-      if (sortOrder === 'latest') {
-        return a.postedDaysAgo - b.postedDaysAgo;
-      }
-      // Simple heuristic for salary sort (parsing range strings is complex, mocking simple sort)
-      if (sortOrder === 'oldest') {
-        return b.postedDaysAgo - a.postedDaysAgo;
-      }
+      if (sortOrder === 'match-desc') return b.score - a.score;
+      if (sortOrder === 'latest') return a.postedDaysAgo - b.postedDaysAgo;
+      if (sortOrder === 'oldest') return b.postedDaysAgo - a.postedDaysAgo;
       return 0;
     });
-  }, [keyword, locationFilter, modeFilter, expFilter, sourceFilter, sortOrder]);
+  }, [processedJobs, keyword, locationFilter, modeFilter, expFilter, sourceFilter, sortOrder, showMatchesOnly, preferences]);
 
   return (
     <div className="space-y-8">
@@ -71,8 +88,26 @@ export const Dashboard: React.FC = () => {
           <h1 className="font-serif text-3xl font-bold text-stone-900 mb-2">Job Feed</h1>
           <p className="text-stone-500">Discover precision-matched opportunities.</p>
         </div>
-        <div className="text-sm font-medium text-stone-400">
-          Showing {filteredJobs.length} results
+        <div className="flex items-center gap-4">
+           {!preferences ? (
+             <Link to="/settings" className="flex items-center gap-2 text-sm text-red-800 bg-red-50 px-3 py-1.5 rounded-sm border border-red-100 hover:bg-red-100 transition-colors">
+               <AlertCircle size={14} />
+               Set preferences to enable scoring
+             </Link>
+           ) : (
+             <label className="flex items-center gap-2 cursor-pointer select-none">
+               <div className="relative">
+                 <input 
+                    type="checkbox" 
+                    className="peer sr-only" 
+                    checked={showMatchesOnly}
+                    onChange={() => setShowMatchesOnly(!showMatchesOnly)}
+                 />
+                 <div className="w-11 h-6 bg-stone-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-900"></div>
+               </div>
+               <span className="text-sm font-medium text-stone-700">Show Matches Only ({preferences.minMatchScore}+)</span>
+             </label>
+           )}
         </div>
       </div>
 
@@ -147,6 +182,7 @@ export const Dashboard: React.FC = () => {
               onChange={(e) => setSortOrder(e.target.value)}
               className="w-full appearance-none bg-stone-100 border border-stone-200 text-stone-900 font-medium text-sm px-3 py-2 rounded-sm focus:outline-none focus:border-stone-400 cursor-pointer"
             >
+              <option value="match-desc">Match Score</option>
               <option value="latest">Latest First</option>
               <option value="oldest">Oldest First</option>
             </select>
@@ -164,6 +200,7 @@ export const Dashboard: React.FC = () => {
               key={job.id} 
               job={job} 
               isSaved={savedIds.includes(job.id)}
+              matchScore={job.score}
               onToggleSave={toggleSave}
               onView={setSelectedJob}
             />
@@ -172,20 +209,35 @@ export const Dashboard: React.FC = () => {
       ) : (
         <div className="flex flex-col items-center justify-center py-20 text-center">
           <Filter size={48} className="text-stone-200 mb-4" />
-          <h3 className="font-serif text-xl text-stone-900 mb-2">No jobs found</h3>
-          <p className="text-stone-500">Try adjusting your filters to see more results.</p>
-          <button 
-            onClick={() => {
-              setKeyword('');
-              setLocationFilter('');
-              setModeFilter('');
-              setExpFilter('');
-              setSourceFilter('');
-            }}
-            className="mt-6 text-red-900 font-medium border-b border-red-900/30 hover:border-red-900 transition-colors"
-          >
-            Clear all filters
-          </button>
+          <h3 className="font-serif text-xl text-stone-900 mb-2">No matching jobs found</h3>
+          <p className="text-stone-500 max-w-md mx-auto">
+            {preferences && showMatchesOnly 
+              ? `No jobs met your match threshold of ${preferences.minMatchScore}. Try lowering it in Settings or adjusting your filters.` 
+              : "Try adjusting your filters to see more results."}
+          </p>
+          <div className="flex gap-4 mt-6">
+             <button 
+              onClick={() => {
+                setKeyword('');
+                setLocationFilter('');
+                setModeFilter('');
+                setExpFilter('');
+                setSourceFilter('');
+                setShowMatchesOnly(false);
+              }}
+              className="text-stone-600 font-medium hover:text-stone-900 transition-colors"
+            >
+              Clear filters
+            </button>
+            {preferences && showMatchesOnly && (
+               <Link 
+                 to="/settings"
+                 className="text-red-900 font-medium border-b border-red-900/30 hover:border-red-900 pb-0.5 transition-colors"
+               >
+                 Adjust threshold &rarr;
+               </Link>
+            )}
+          </div>
         </div>
       )}
 
