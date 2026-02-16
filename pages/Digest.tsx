@@ -159,7 +159,7 @@ export const Digest: React.FC = () => {
       <div className="w-full max-w-4xl mx-auto py-20 text-center">
          <h2 className="font-serif text-2xl text-stone-900 mb-4">No matching roles today</h2>
          <p className="text-stone-500 max-w-md mx-auto mb-8">
-           We couldn't find any jobs matching your strict criteria (Score >= {preferences.minMatchScore}). Try adjusting your preferences or checking back tomorrow.
+           We couldn't find any jobs matching your strict criteria (Score &ge; {preferences.minMatchScore}). Try adjusting your preferences or checking back tomorrow.
          </p>
          <Link to="/settings" className="text-red-900 font-medium border-b border-red-900/30 hover:border-red-900 pb-0.5 transition-colors">
             Adjust Preferences
