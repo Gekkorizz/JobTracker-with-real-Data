@@ -1,16 +1,18 @@
 import React from 'react';
-import { MapPin, Clock, DollarSign, Briefcase, Bookmark, ExternalLink, Eye, Target } from 'lucide-react';
+import { MapPin, Clock, DollarSign, Briefcase, Bookmark, ExternalLink, Eye, Target, CheckCircle2 } from 'lucide-react';
 import { Job } from '../data/jobs';
 
 interface JobCardProps {
   job: Job;
   isSaved: boolean;
   matchScore: number;
+  status?: string;
   onToggleSave: (id: string) => void;
   onView: (job: Job) => void;
+  onStatusChange?: (id: string, newStatus: string) => void;
 }
 
-export const JobCard: React.FC<JobCardProps> = ({ job, isSaved, matchScore, onToggleSave, onView }) => {
+export const JobCard: React.FC<JobCardProps> = ({ job, isSaved, matchScore, status = 'Not Applied', onToggleSave, onView, onStatusChange }) => {
   
   let scoreColorClass = 'bg-stone-100 text-stone-600 border-stone-200';
   if (matchScore >= 80) {
@@ -20,6 +22,16 @@ export const JobCard: React.FC<JobCardProps> = ({ job, isSaved, matchScore, onTo
   } else if (matchScore < 40) {
     scoreColorClass = 'bg-stone-50 text-stone-400 border-stone-100';
   }
+
+  // Status Styling
+  const getStatusStyles = (s: string) => {
+    switch(s) {
+      case 'Applied': return 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100';
+      case 'Rejected': return 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100';
+      case 'Selected': return 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100';
+      default: return 'bg-stone-100 text-stone-600 border-stone-200 hover:bg-stone-200';
+    }
+  };
 
   return (
     <div className="bg-white border border-stone-200 rounded-sm p-5 hover:shadow-lg hover:border-stone-300 transition-all duration-300 group relative flex flex-col h-full">
@@ -66,6 +78,25 @@ export const JobCard: React.FC<JobCardProps> = ({ job, isSaved, matchScore, onTo
           <span className="truncate">{job.postedDaysAgo === 0 ? 'Today' : `${job.postedDaysAgo}d ago`}</span>
         </div>
       </div>
+
+      {/* Status Selector */}
+      {onStatusChange && (
+        <div className="mb-4">
+          <div className="relative inline-block w-full">
+            <select
+              value={status}
+              onChange={(e) => onStatusChange(job.id, e.target.value)}
+              className={`w-full appearance-none cursor-pointer py-1.5 px-3 pr-8 rounded-sm text-xs font-bold uppercase tracking-wider border focus:outline-none focus:ring-1 focus:ring-offset-1 transition-colors ${getStatusStyles(status)}`}
+            >
+              <option value="Not Applied">Not Applied</option>
+              <option value="Applied">Applied</option>
+              <option value="Rejected">Rejected</option>
+              <option value="Selected">Selected</option>
+            </select>
+            <CheckCircle2 size={12} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none opacity-50" />
+          </div>
+        </div>
+      )}
 
       <div className="flex items-center gap-2 pt-4 border-t border-stone-100 mt-auto">
         <button 

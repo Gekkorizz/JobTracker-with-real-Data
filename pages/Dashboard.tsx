@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, Filter, SlidersHorizontal, ChevronDown, Zap, AlertCircle } from 'lucide-react';
+import { Search, Filter, SlidersHorizontal, ChevronDown, AlertCircle, CheckCircle, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { jobs, Job, locations, modes, experiences, sources } from '../data/jobs';
 import { JobCard } from '../components/JobCard';
 import { JobDetailsModal } from '../components/JobDetailsModal';
 import { calculateMatchScore, getPreferences, Preferences } from '../utils/scoring';
+import { getStoredStatuses, updateJobStatus, JobStatus } from '../utils/status';
 
 export const Dashboard: React.FC = () => {
   // State for Filters
@@ -13,10 +14,15 @@ export const Dashboard: React.FC = () => {
   const [modeFilter, setModeFilter] = useState('');
   const [expFilter, setExpFilter] = useState('');
   const [sourceFilter, setSourceFilter] = useState('');
-  const [sortOrder, setSortOrder] = useState('match-desc'); // default to match score
+  const [statusFilter, setStatusFilter] = useState(''); // New Status Filter
+  const [sortOrder, setSortOrder] = useState('match-desc');
 
   const [showMatchesOnly, setShowMatchesOnly] = useState(false);
   const [preferences, setPreferences] = useState<Preferences | null>(null);
+
+  // Job Status State
+  const [statuses, setStatuses] = useState<Record<string, JobStatus>>({});
+  const [toast, setToast] = useState<{message: string, visible: boolean}>({ message: '', visible: false });
 
   // State for Saved Jobs (Local Storage)
   const [savedIds, setSavedIds] = useState<string[]>(() => {
@@ -31,8 +37,10 @@ export const Dashboard: React.FC = () => {
     const prefs = getPreferences();
     setPreferences(prefs);
     if (prefs) {
-      setShowMatchesOnly(true); // Auto-enable if prefs exist
+      setShowMatchesOnly(true);
     }
+    // Load statuses
+    setStatuses(getStoredStatuses());
   }, []);
 
   // Persist Saved IDs
@@ -45,6 +53,39 @@ export const Dashboard: React.FC = () => {
       prev.includes(id) ? prev.filter(savedId => savedId !== id) : [...prev, id]
     );
   };
+
+  const handleStatusChange = (id: string, newStatus: string) => {
+    const job = jobs.find(j => j.id === id);
+    if (!job) return;
+
+    const ns = newStatus as JobStatus;
+    updateJobStatus({ id: job.id, title: job.title, company: job.company }, ns);
+    setStatuses(prev => ({ ...prev, [id]: ns }));
+
+    // Show Toast
+    setToast({ message: `Status updated: ${ns}`, visible: true });
+    setTimeout(() => setToast(prev => ({ ...prev, visible: false })), 3000);
+  };
+
+  const clearAllFilters = () => {
+    setKeyword('');
+    setLocationFilter('');
+    setModeFilter('');
+    setExpFilter('');
+    setSourceFilter('');
+    setStatusFilter('');
+    setShowMatchesOnly(false);
+  };
+
+  const hasActiveFilters = Boolean(
+    keyword || 
+    locationFilter || 
+    modeFilter || 
+    expFilter || 
+    sourceFilter || 
+    statusFilter || 
+    showMatchesOnly
+  );
 
   // Process jobs with scores
   const processedJobs = useMemo(() => {
@@ -70,18 +111,30 @@ export const Dashboard: React.FC = () => {
       const matchExp = !expFilter || job.experience === expFilter;
       const matchSource = !sourceFilter || job.source === sourceFilter;
 
-      return matchKeyword && matchLocation && matchMode && matchExp && matchSource;
+      // 3. Status Filter
+      const currentStatus = statuses[job.id] || 'Not Applied';
+      const matchStatus = !statusFilter || currentStatus === statusFilter;
+
+      return matchKeyword && matchLocation && matchMode && matchExp && matchSource && matchStatus;
     }).sort((a, b) => {
       if (sortOrder === 'match-desc') return b.score - a.score;
       if (sortOrder === 'latest') return a.postedDaysAgo - b.postedDaysAgo;
       if (sortOrder === 'oldest') return b.postedDaysAgo - a.postedDaysAgo;
       return 0;
     });
-  }, [processedJobs, keyword, locationFilter, modeFilter, expFilter, sourceFilter, sortOrder, showMatchesOnly, preferences]);
+  }, [processedJobs, keyword, locationFilter, modeFilter, expFilter, sourceFilter, statusFilter, sortOrder, showMatchesOnly, preferences, statuses]);
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 relative">
       
+      {/* Toast Notification */}
+      {toast.visible && (
+        <div className="fixed bottom-6 right-6 z-50 bg-stone-900 text-white px-6 py-3 rounded-sm shadow-lg flex items-center gap-3 animate-fade-in-up">
+           <CheckCircle size={18} className="text-green-400" />
+           <span className="font-medium">{toast.message}</span>
+        </div>
+      )}
+
       {/* Header Section */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-stone-200 pb-6">
         <div>
@@ -113,20 +166,31 @@ export const Dashboard: React.FC = () => {
 
       {/* Filter Bar */}
       <div className="bg-white p-4 border border-stone-200 rounded-sm shadow-sm space-y-4">
-        {/* Top Row: Search */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" size={18} />
-          <input 
-            type="text" 
-            placeholder="Search by role or company..."
-            value={keyword}
-            onChange={(e) => setKeyword(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 bg-stone-50 border border-stone-200 rounded-sm focus:outline-none focus:border-red-900 focus:ring-1 focus:ring-red-900 text-stone-800 placeholder:text-stone-400"
-          />
+        {/* Top Row: Search + Clear */}
+        <div className="flex gap-3">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" size={18} />
+            <input 
+              type="text" 
+              placeholder="Search by role or company..."
+              value={keyword}
+              onChange={(e) => setKeyword(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 bg-stone-50 border border-stone-200 rounded-sm focus:outline-none focus:border-red-900 focus:ring-1 focus:ring-red-900 text-stone-800 placeholder:text-stone-400"
+            />
+          </div>
+          {hasActiveFilters && (
+            <button 
+              onClick={clearAllFilters}
+              className="px-4 py-2 bg-stone-100 text-stone-600 rounded-sm text-sm font-medium hover:bg-stone-200 hover:text-stone-900 transition-colors whitespace-nowrap flex items-center gap-2"
+            >
+              <X size={14} className="stroke-[2.5px]" />
+              Clear Filters
+            </button>
+          )}
         </div>
 
         {/* Bottom Row: Dropdowns */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
           
           <div className="relative group">
             <select 
@@ -176,6 +240,22 @@ export const Dashboard: React.FC = () => {
             <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 pointer-events-none" />
           </div>
 
+          {/* Status Filter */}
+          <div className="relative group">
+            <select 
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="w-full appearance-none bg-white border border-stone-200 text-stone-700 text-sm px-3 py-2 rounded-sm focus:outline-none focus:border-stone-400 cursor-pointer hover:border-stone-300 font-medium"
+            >
+              <option value="">All Statuses</option>
+              <option value="Not Applied">Not Applied</option>
+              <option value="Applied">Applied</option>
+              <option value="Rejected">Rejected</option>
+              <option value="Selected">Selected</option>
+            </select>
+            <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 pointer-events-none" />
+          </div>
+
           <div className="relative group">
             <select 
               value={sortOrder}
@@ -201,8 +281,10 @@ export const Dashboard: React.FC = () => {
               job={job} 
               isSaved={savedIds.includes(job.id)}
               matchScore={job.score}
+              status={statuses[job.id]} // Pass current status
               onToggleSave={toggleSave}
               onView={setSelectedJob}
+              onStatusChange={handleStatusChange} // Handle update
             />
           ))}
         </div>
@@ -217,14 +299,7 @@ export const Dashboard: React.FC = () => {
           </p>
           <div className="flex gap-4 mt-6">
              <button 
-              onClick={() => {
-                setKeyword('');
-                setLocationFilter('');
-                setModeFilter('');
-                setExpFilter('');
-                setSourceFilter('');
-                setShowMatchesOnly(false);
-              }}
+              onClick={clearAllFilters}
               className="text-stone-600 font-medium hover:text-stone-900 transition-colors"
             >
               Clear filters

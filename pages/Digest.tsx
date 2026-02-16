@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Mail, Copy, Send, RefreshCw, AlertCircle, Calendar } from 'lucide-react';
+import { Mail, Copy, Send, RefreshCw, AlertCircle, Calendar, History, CheckCircle2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { jobs, Job } from '../data/jobs';
 import { calculateMatchScore, getPreferences, Preferences } from '../utils/scoring';
+import { getStatusHistory, StatusUpdate } from '../utils/status';
 
 type ScoredJob = Job & { score: number };
 
@@ -11,6 +12,7 @@ export const Digest: React.FC = () => {
   const [preferences, setPreferences] = useState<Preferences | null>(null);
   const [loading, setLoading] = useState(false);
   const [dateStr, setDateStr] = useState('');
+  const [statusHistory, setStatusHistory] = useState<StatusUpdate[]>([]);
 
   useEffect(() => {
     // 1. Load Preferences
@@ -32,6 +34,9 @@ export const Digest: React.FC = () => {
     if (storedDigest) {
       setDigest(JSON.parse(storedDigest));
     }
+
+    // 4. Load Status History
+    setStatusHistory(getStatusHistory());
   }, []);
 
   const generateDigest = () => {
@@ -94,6 +99,12 @@ export const Digest: React.FC = () => {
     
     const body = encodeURIComponent(`Here is my daily job digest for ${dateStr}:\n\n`) + bodyContent;
     window.location.href = `mailto:?subject=${subject}&body=${body}`;
+  };
+
+  // Helper to format history date
+  const formatHistoryDate = (isoString: string) => {
+    const date = new Date(isoString);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
   };
 
   // RENDER STATES
@@ -176,88 +187,130 @@ export const Digest: React.FC = () => {
 
   // 5. Display Digest
   return (
-    <div className="w-full max-w-3xl mx-auto">
+    <div className="w-full max-w-5xl mx-auto flex flex-col lg:flex-row gap-8 items-start">
       
-      {/* Tools Bar */}
-      <div className="flex justify-between items-center mb-8">
-        <Link to="/dashboard" className="text-sm font-medium text-stone-500 hover:text-stone-900 transition-colors">
-          &larr; Back to Dashboard
-        </Link>
-        <div className="flex gap-3">
-          <button onClick={copyToClipboard} className="flex items-center gap-2 px-4 py-2 bg-white border border-stone-200 text-stone-700 rounded-sm text-sm font-medium hover:bg-stone-50 transition-colors">
-            <Copy size={14} /> Copy
-          </button>
-          <button onClick={createEmailDraft} className="flex items-center gap-2 px-4 py-2 bg-stone-900 text-white rounded-sm text-sm font-medium hover:bg-stone-800 transition-colors">
-            <Send size={14} /> Email Draft
-          </button>
-        </div>
-      </div>
-
-      {/* Email Container */}
-      <div className="bg-white border border-stone-200 shadow-sm rounded-sm overflow-hidden">
-        
-        {/* Header */}
-        <div className="bg-stone-50 border-b border-stone-100 p-8 text-center">
-          <div className="inline-flex items-center justify-center w-12 h-12 bg-red-900 rounded-full text-white mb-4">
-            <span className="font-serif font-bold text-xl">J</span>
-          </div>
-          <h1 className="font-serif text-2xl md:text-3xl font-bold text-stone-900 mb-2">
-            Top 10 Jobs For You
-          </h1>
-          <div className="flex items-center justify-center gap-2 text-stone-500 text-sm font-medium uppercase tracking-wider">
-            <Calendar size={14} />
-            {dateStr}
+      {/* Main Digest Column */}
+      <div className="flex-1 w-full">
+        {/* Tools Bar */}
+        <div className="flex justify-between items-center mb-8">
+          <Link to="/dashboard" className="text-sm font-medium text-stone-500 hover:text-stone-900 transition-colors">
+            &larr; Back to Dashboard
+          </Link>
+          <div className="flex gap-3">
+            <button onClick={copyToClipboard} className="flex items-center gap-2 px-4 py-2 bg-white border border-stone-200 text-stone-700 rounded-sm text-sm font-medium hover:bg-stone-50 transition-colors">
+              <Copy size={14} /> Copy
+            </button>
+            <button onClick={createEmailDraft} className="flex items-center gap-2 px-4 py-2 bg-stone-900 text-white rounded-sm text-sm font-medium hover:bg-stone-800 transition-colors">
+              <Send size={14} /> Email Draft
+            </button>
           </div>
         </div>
 
-        {/* Content */}
-        <div className="p-8 space-y-8">
-          {digest && digest.map((job, index) => (
-            <div key={job.id} className="group flex flex-col sm:flex-row gap-4 sm:items-start justify-between pb-8 border-b border-stone-100 last:border-0 last:pb-0">
-              <div className="space-y-1">
-                <div className="flex items-baseline gap-3">
-                   <h3 className="font-serif text-lg font-bold text-stone-900 group-hover:text-red-900 transition-colors">
-                     {index + 1}. {job.title}
-                   </h3>
-                   {/* Score Badge */}
-                   <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-sm ${
-                      job.score && job.score >= 80 ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'
-                   }`}>
-                     {job.score}% Match
-                   </span>
-                </div>
-                <p className="text-stone-600 font-medium">{job.company}</p>
-                <div className="flex items-center gap-3 text-sm text-stone-500">
-                  <span>{job.location} ({job.mode})</span>
-                  <span>&bull;</span>
-                  <span>{job.experience}</span>
-                  <span>&bull;</span>
-                  <span>{job.salaryRange}</span>
-                </div>
-              </div>
-
-              <a 
-                href={job.applyUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="self-start sm:self-center shrink-0 px-4 py-2 bg-stone-100 text-stone-700 text-xs font-bold uppercase tracking-wider rounded-sm hover:bg-red-900 hover:text-white transition-all"
-              >
-                Apply
-              </a>
+        {/* Email Container */}
+        <div className="bg-white border border-stone-200 shadow-sm rounded-sm overflow-hidden">
+          
+          {/* Header */}
+          <div className="bg-stone-50 border-b border-stone-100 p-8 text-center">
+            <div className="inline-flex items-center justify-center w-12 h-12 bg-red-900 rounded-full text-white mb-4">
+              <span className="font-serif font-bold text-xl">J</span>
             </div>
-          ))}
+            <h1 className="font-serif text-2xl md:text-3xl font-bold text-stone-900 mb-2">
+              Top 10 Jobs For You
+            </h1>
+            <div className="flex items-center justify-center gap-2 text-stone-500 text-sm font-medium uppercase tracking-wider">
+              <Calendar size={14} />
+              {dateStr}
+            </div>
+          </div>
+
+          {/* Content */}
+          <div className="p-8 space-y-8">
+            {digest && digest.map((job, index) => (
+              <div key={job.id} className="group flex flex-col sm:flex-row gap-4 sm:items-start justify-between pb-8 border-b border-stone-100 last:border-0 last:pb-0">
+                <div className="space-y-1">
+                  <div className="flex items-baseline gap-3">
+                     <h3 className="font-serif text-lg font-bold text-stone-900 group-hover:text-red-900 transition-colors">
+                       {index + 1}. {job.title}
+                     </h3>
+                     {/* Score Badge */}
+                     <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-sm ${
+                        job.score && job.score >= 80 ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'
+                     }`}>
+                       {job.score}% Match
+                     </span>
+                  </div>
+                  <p className="text-stone-600 font-medium">{job.company}</p>
+                  <div className="flex items-center gap-3 text-sm text-stone-500">
+                    <span>{job.location} ({job.mode})</span>
+                    <span>&bull;</span>
+                    <span>{job.experience}</span>
+                    <span>&bull;</span>
+                    <span>{job.salaryRange}</span>
+                  </div>
+                </div>
+
+                <a 
+                  href={job.applyUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="self-start sm:self-center shrink-0 px-4 py-2 bg-stone-100 text-stone-700 text-xs font-bold uppercase tracking-wider rounded-sm hover:bg-red-900 hover:text-white transition-all"
+                >
+                  Apply
+                </a>
+              </div>
+            ))}
+          </div>
+
+          {/* Footer */}
+          <div className="bg-stone-50 border-t border-stone-100 p-6 text-center text-stone-400 text-xs">
+            <p className="mb-2">This digest was generated based on your preferences.</p>
+            <p>Job Notification Tracker &copy; {new Date().getFullYear()}</p>
+          </div>
+
         </div>
 
-        {/* Footer */}
-        <div className="bg-stone-50 border-t border-stone-100 p-6 text-center text-stone-400 text-xs">
-          <p className="mb-2">This digest was generated based on your preferences.</p>
-          <p>Job Notification Tracker &copy; {new Date().getFullYear()}</p>
+        <div className="text-center mt-6 text-stone-300 text-xs font-mono">
+          Demo Mode: Daily 9AM trigger simulated manually.
         </div>
-
       </div>
 
-      <div className="text-center mt-6 text-stone-300 text-xs font-mono">
-        Demo Mode: Daily 9AM trigger simulated manually.
+      {/* Side Column: Recent Updates */}
+      <div className="w-full lg:w-80 shrink-0">
+        <div className="bg-white border border-stone-200 rounded-sm p-6 sticky top-6">
+           <div className="flex items-center gap-2 mb-4 text-stone-900 font-bold uppercase tracking-wider text-sm border-b border-stone-100 pb-2">
+             <History size={16} className="text-red-900" />
+             Recent Status Updates
+           </div>
+           
+           {statusHistory.length === 0 ? (
+             <p className="text-sm text-stone-400 italic">No updates tracked yet.</p>
+           ) : (
+             <div className="space-y-4">
+               {statusHistory.slice(0, 10).map((item, idx) => (
+                 <div key={idx} className="flex gap-3 items-start">
+                   <div className="mt-1">
+                     <CheckCircle2 size={14} className="text-stone-300" />
+                   </div>
+                   <div>
+                     <p className="text-xs font-bold text-stone-800">{item.title}</p>
+                     <p className="text-[10px] text-stone-500 mb-1">{item.company}</p>
+                     <div className="flex items-center gap-2">
+                       <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-sm uppercase ${
+                         item.status === 'Applied' ? 'bg-blue-50 text-blue-700' :
+                         item.status === 'Rejected' ? 'bg-red-50 text-red-700' :
+                         item.status === 'Selected' ? 'bg-green-50 text-green-700' :
+                         'bg-stone-100 text-stone-600'
+                       }`}>
+                         {item.status}
+                       </span>
+                       <span className="text-[10px] text-stone-400">{formatHistoryDate(item.date)}</span>
+                     </div>
+                   </div>
+                 </div>
+               ))}
+             </div>
+           )}
+        </div>
       </div>
     </div>
   );
