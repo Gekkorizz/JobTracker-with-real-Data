@@ -7,6 +7,8 @@ import { Settings } from './pages/Settings';
 import { Saved } from './pages/Saved';
 import { Digest } from './pages/Digest';
 import { Proof } from './pages/Proof';
+import { TestChecklist } from './pages/TestChecklist';
+import { Ship } from './pages/Ship';
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return (
@@ -40,6 +42,9 @@ const AppRoutes = () => {
         <Route path="/saved" element={<Saved />} />
         <Route path="/digest" element={<Digest />} />
         <Route path="/proof" element={<Proof />} />
+        {/* Internal QA Routes */}
+        <Route path="/jt/07-test" element={<TestChecklist />} />
+        <Route path="/jt/08-ship" element={<Ship />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Layout>
