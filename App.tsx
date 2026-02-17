@@ -9,6 +9,7 @@ import { Digest } from './pages/Digest';
 import { Proof } from './pages/Proof';
 import { TestChecklist } from './pages/TestChecklist';
 import { Ship } from './pages/Ship';
+import { FinalProof } from './pages/FinalProof';
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return (
@@ -45,6 +46,7 @@ const AppRoutes = () => {
         {/* Internal QA Routes */}
         <Route path="/jt/07-test" element={<TestChecklist />} />
         <Route path="/jt/08-ship" element={<Ship />} />
+        <Route path="/jt/proof" element={<FinalProof />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Layout>
